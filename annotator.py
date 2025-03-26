@@ -1,3 +1,5 @@
+import ctypes
+ctypes.CDLL("libX11.so.6").XInitThreads()
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import os

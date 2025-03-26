@@ -1,11 +1,12 @@
 import os
 import sys
+import pandas as pd
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QKeyEvent, QAction, QKeySequence, QPainter
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QStyle,
                              QWidget, QFileDialog, QMessageBox, QLabel, QHBoxLayout, QToolBar, QStyleOption)
-from typing import Union, Optional, Callable
+from typing import Optional, Callable
 
 # Monk Skin Tone Color Palette (10 squares)
 monk_skin_tone_colors = [
@@ -114,6 +115,12 @@ class ColorSamplesLayout(QHBoxLayout):
             return True
         return False
 
+    def select_widget(self, index):
+        self.reset()
+        w = self.color_widgets[index]
+        w.select()
+        self.selected_widget = w
+        self.update()
 
     def get_selected_index(self) -> Optional[int]:
         if not self.selected_widget:
@@ -190,6 +197,7 @@ class Annotator(QMainWindow):
         self.current_images_folder_path = None
 
         self.annotations_file_path = None
+        self.annotations_df = None
 
 
     def select_image_folder(self):
@@ -221,7 +229,7 @@ class Annotator(QMainWindow):
         Provides robust error handling and user feedback.
         """
         # First, check if an image folder is selected
-        if not hasattr(self, 'current_images_folder_path') or not self.current_images_folder_path:
+        if not self.current_images_folder_path:
             QMessageBox.warning(
                 self,
                 "No Image Folder",
@@ -254,9 +262,16 @@ class Annotator(QMainWindow):
             if not file_path.lower().endswith(".csv"):
                 file_path += '.csv'
 
-            # Attempt to create (or overwrite) the file
-            with open(file_path, 'w') as f:
-                pass
+            self.annotations_df = pd.DataFrame(columns=[
+                'folder_name',
+                'image_name',
+                'monk_skin_tone_index',
+                'monk_skin_tone_color',
+                'fitzpatrick_index',
+                'fitzpatrick_color'
+            ])
+            # Save empty DataFrame to create the file
+            self.annotations_df.to_csv(file_path, index=False)
 
             self.annotations_file_path = file_path
 
@@ -287,7 +302,135 @@ class Annotator(QMainWindow):
             )
 
     def open_annotations_file(self):
-        pass
+        """
+        Open an existing annotations file and load its contents into the DataFrame.
+        """
+        if not self.current_images_folder_path:
+            QMessageBox.warning(
+                self,
+                "No Image Folder",
+                "Please select an image folder first before creating an annotations file."
+            )
+            return
+
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Open Annotations File",
+                "",
+                "CSV Files (*.csv)"
+            )
+
+            if not file_path:
+                return
+
+            # Load annotations
+            temp_df = pd.read_csv(file_path)
+
+            # Ensure folder_name column exists
+            if "folder_name" not in temp_df.columns:
+                QMessageBox.critical(self, "Invalid Annotations File",
+                                     "The selected annotations file does not contain a 'folder_name' column.")
+                return
+
+            # Get current folder name
+            current_folder_name = os.path.basename(self.current_images_folder_path)
+
+            # Check if folder matches
+            if not (temp_df["folder_name"] == current_folder_name).all():
+                QMessageBox.critical(self, "Folder Mismatch",
+                                     "The selected annotations file does not match the currently opened image folder.")
+                return
+
+            # Load existing annotations
+            self.annotations_df = pd.read_csv(file_path)
+            self.annotations_file_path = file_path
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Annotations file loaded successfully:\n{file_path}"
+            )
+
+            self.update_current_image_annotations()
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error Loading File",
+                f"Could not load annotations file: {str(e)}"
+            )
+
+    def save_annotation(self):
+        """
+        Save the current image's annotation to the DataFrame and CSV file.
+        """
+        # Check if annotation file and color selections are ready
+        if (self.annotations_file_path is None or
+                not self.image_names or
+                self.monk_skin_tone_picker.get_selected_index() is None or
+                self.fitzpatrick_skin_tone_picker.get_selected_index() is None):
+            return
+
+        # Get current image name
+        current_image_name = self.image_names[self.current_image_index]
+
+        # Get selected color indices and hex values
+        monk_index = self.monk_skin_tone_picker.get_selected_index()
+        monk_color = monk_skin_tone_colors[monk_index]
+
+        fitzpatrick_index = self.fitzpatrick_skin_tone_picker.get_selected_index()
+        fitzpatrick_color = fitzpatrick_colors[fitzpatrick_index]
+
+        folder_name = os.path.basename(self.current_images_folder_path)
+
+        # Create new annotation record
+        new_annotation = pd.DataFrame({
+            'folder_name': [folder_name],
+            'image_name': [current_image_name],
+            'monk_skin_tone_index': [monk_index],
+            'monk_skin_tone_color': [monk_color],
+            'fitzpatrick_index': [fitzpatrick_index],
+            'fitzpatrick_color': [fitzpatrick_color]
+        })
+
+        # Check if image already annotated and update or append
+        existing_annotation = self.annotations_df[
+            self.annotations_df['image_name'] == current_image_name
+            ]
+
+        if not existing_annotation.empty:
+            # Replace existing annotation
+            self.annotations_df = self.annotations_df[
+                self.annotations_df['image_name'] != current_image_name
+                ]
+
+        # Append new annotation
+        self.annotations_df = pd.concat([
+            self.annotations_df,
+            new_annotation
+        ], ignore_index=True)
+
+        # Save to CSV
+        self.annotations_df.to_csv(self.annotations_file_path, index=False)
+
+    def update_current_image_annotations(self):
+        # Check if this image has been annotated
+        if self.annotations_df is not None and not self.annotations_df.empty:
+            annotation_row = self.annotations_df[self.annotations_df["image_name"] == self.image_names[self.current_image_index]]
+
+            print(annotation_row)
+            if not annotation_row.empty:
+                # this image exists in the annotation file
+                monk_index = int(annotation_row["monk_skin_tone_index"].values[0])
+                fitzpatrick_index = int(annotation_row["fitzpatrick_index"].values[0])
+
+                print(monk_index, fitzpatrick_index)
+                self.monk_skin_tone_picker.select_widget(monk_index)
+                self.fitzpatrick_skin_tone_picker.select_widget(fitzpatrick_index)
+            else:
+                self.monk_skin_tone_picker.reset()
+                self.fitzpatrick_skin_tone_picker.reset()
 
     def display_image(self, index: int):
         image_name = self.image_names[index]
@@ -307,6 +450,9 @@ class Annotator(QMainWindow):
         image_count_text = f"Image {self.current_image_index + 1} of {len(self.image_names)}: {image_name}"
         self.image_count_label.setText(image_count_text)
 
+        self.update_current_image_annotations()
+
+
     def keyPressEvent(self, event: QKeyEvent):
         """Handle left and right arrow key navigation"""
         key = event.text().lower()
@@ -316,33 +462,29 @@ class Annotator(QMainWindow):
         if monk_selected or fitzpatrick_selected:
             return
 
-        are_colors_selected = (
-            self.monk_skin_tone_picker.get_selected_index() is not None and
-            self.fitzpatrick_skin_tone_picker.get_selected_index() is not None
-        )
+        # are_colors_selected = (
+        #     self.monk_skin_tone_picker.get_selected_index() is not None and
+        #     self.fitzpatrick_skin_tone_picker.get_selected_index() is not None
+        # )
 
         if not self.image_names:
             return
 
-        if event.key() == Qt.Key.Key_Left:
-            if not are_colors_selected:
-                QMessageBox.warning(self, "Colors not selected", "You must select both colors")
-                return
+        if event.key() == Qt.Key.Key_Left or event.key() == Qt.Key.Key_Right:
+            self.save_annotation()
 
-            # Move to previous image
-            self.current_image_index = (self.current_image_index - 1) % len(self.image_names)
+            if event.key() == Qt.Key.Key_Left:
+                self.current_image_index = (self.current_image_index - 1) % len(self.image_names)
+            else:
+                self.current_image_index = (self.current_image_index + 1) % len(self.image_names)
+
+            # if not are_colors_selected:
+            #     QMessageBox.warning(self, "Colors not selected", "You must select both colors")
+            #     return
+
+            # Save current image's annotation
+
             self.display_image(self.current_image_index)
-            self.reset_both_color_pickers()
-
-        elif event.key() == Qt.Key.Key_Right:
-            if not are_colors_selected:
-                QMessageBox.warning(self, "Colors not selected", "You must select both colors")
-                return
-
-            # Move to next image
-            self.current_image_index = (self.current_image_index + 1) % len(self.image_names)
-            self.display_image(self.current_image_index)
-            self.reset_both_color_pickers()
 
     def reset_both_color_pickers(self):
         self.monk_skin_tone_picker.reset()

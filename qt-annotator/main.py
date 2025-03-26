@@ -416,6 +416,9 @@ class Annotator(QMainWindow):
 
     def update_current_image_annotations(self):
         # Check if this image has been annotated
+        self.monk_skin_tone_picker.reset()
+        self.fitzpatrick_skin_tone_picker.reset()
+
         if self.annotations_df is not None and not self.annotations_df.empty:
             annotation_row = self.annotations_df[self.annotations_df["image_name"] == self.image_names[self.current_image_index]]
 
@@ -428,9 +431,6 @@ class Annotator(QMainWindow):
                 print(monk_index, fitzpatrick_index)
                 self.monk_skin_tone_picker.select_widget(monk_index)
                 self.fitzpatrick_skin_tone_picker.select_widget(fitzpatrick_index)
-            else:
-                self.monk_skin_tone_picker.reset()
-                self.fitzpatrick_skin_tone_picker.reset()
 
     def display_image(self, index: int):
         image_name = self.image_names[index]

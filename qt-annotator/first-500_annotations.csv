@@ -1,0 +1,9 @@
+folder_name,image_name,monk_skin_tone_index,monk_skin_tone_color,fitzpatrick_index,fitzpatrick_color
+first-500,ISIC_0232101.jpg,0,#8D5524,0,#FFE5B4
+first-500,ISIC_0091996.jpg,1,#A76C4E,1,#F4A460
+first-500,ISIC_0223857.jpg,2,#C68642,2,#D2691E
+first-500,ISIC_0199494.jpg,3,#E0A060,3,#8B4513
+first-500,ISIC_0170583.jpg,4,#F1C27D,4,#5D4037
+first-500,ISIC_0079038.jpg,5,#FFDBAC,5,#3E2723
+first-500,ISIC_0089569.jpg,2,#C68642,1,#F4A460
+first-500,ISIC_0074311.jpg,6,#F6CEB9,0,#FFE5B4

@@ -50,7 +50,7 @@ class Annotator(QMainWindow):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Image Folder")
 
         if not folder_path:
-            QMessageBox.warning(self, "Error", "Not path selected")
+            QMessageBox.warning(self, "Error", "No path selected")
             return
 
         self.current_images_folder_path = folder_path

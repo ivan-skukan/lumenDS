@@ -49,9 +49,12 @@ class ColorWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.is_selected = not self.is_selected
-            self.update_style()
-            self.onColorClick(self)
+            self.handle_selection()
+
+    def handle_selection(self):
+        self.is_selected = not self.is_selected
+        self.update_style()
+        self.onColorClick(self)
 
     def update_style(self):
         if self.is_selected:
@@ -78,16 +81,20 @@ class ColorWidget(QWidget):
 
 
 class ColorSamplesLayout(QHBoxLayout):
-    def __init__(self, colors, *args, **kwargs):
+    def __init__(self, colors, keys, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.color_widgets = []
         self.selected_widget = None
 
-        for color_hex in colors:
+        self.key_to_widget = {}
+
+        for color_hex, key in zip(colors, keys):
             color_widget = ColorWidget(color_hex, self.handle_color_click)
             self.color_widgets.append(color_widget)
             self.addWidget(color_widget)
+
+            self.key_to_widget[key] = color_widget
 
     def handle_color_click(self, clicked_widget):
         for widget in self.color_widgets:
@@ -95,6 +102,18 @@ class ColorSamplesLayout(QHBoxLayout):
                 widget.deselect()
 
         self.selected_widget = clicked_widget
+
+    def handle_key_press(self, key):
+        if key in self.key_to_widget:
+            widget = self.key_to_widget[key]
+
+            self.reset()
+            widget.select()
+            self.selected_widget = widget
+
+            return True
+        return False
+
 
     def get_selected_index(self) -> Optional[int]:
         if not self.selected_widget:
@@ -151,12 +170,18 @@ class Annotator(QMainWindow):
         main_layout.addWidget(self.image_count_label, 1)
 
         # Monk scale
-        self.monk_skin_tone_picker = ColorSamplesLayout(monk_skin_tone_colors)
+        self.monk_skin_tone_picker = ColorSamplesLayout(
+            monk_skin_tone_colors,
+            keys=['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+        )
         main_layout.addLayout(self.monk_skin_tone_picker)
 
         main_layout.addSpacing(20)
 
-        self.fitzpatrick_skin_tone_picker = ColorSamplesLayout(fitzpatrick_colors)
+        self.fitzpatrick_skin_tone_picker = ColorSamplesLayout(
+            fitzpatrick_colors,
+            keys=['q', 'w', 'e', 'r', 't', 'y']
+        )
         main_layout.addLayout(self.fitzpatrick_skin_tone_picker)
 
         # Image tracking variables
@@ -284,10 +309,20 @@ class Annotator(QMainWindow):
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle left and right arrow key navigation"""
-        if not self.image_names:
+        key = event.text().lower()
+        monk_selected = self.monk_skin_tone_picker.handle_key_press(key)
+        fitzpatrick_selected = self.fitzpatrick_skin_tone_picker.handle_key_press(key)
+
+        if monk_selected or fitzpatrick_selected:
             return
 
-        are_colors_selected = self.monk_skin_tone_picker.get_selected_index() is not None and self.fitzpatrick_skin_tone_picker.get_selected_index() is not None
+        are_colors_selected = (
+            self.monk_skin_tone_picker.get_selected_index() is not None and
+            self.fitzpatrick_skin_tone_picker.get_selected_index() is not None
+        )
+
+        if not self.image_names:
+            return
 
         if event.key() == Qt.Key.Key_Left:
             if not are_colors_selected:

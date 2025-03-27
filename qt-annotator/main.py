@@ -9,27 +9,19 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QStyle,
 from typing import Optional, Callable
 
 # Monk Skin Tone Color Palette (10 squares)
-monk_skin_tone_colors = [
-    "#8D5524",  # Darkest brown
-    "#A76C4E",  # Dark brown
-    "#C68642",  # Medium brown
-    "#E0A060",  # Light brown
-    "#F1C27D",  # Light skin
-    "#FFDBAC",  # Lightest skin
-    "#F6CEB9",  # Pale skin
-    "#E7C697",  # Beige
-    "#D2B48C",  # Tan
-    "#C2B280"  # Warm beige
-]
+monk_skin_tone_colors = ["#292420", "#3a312a", "#604134", "#825c43",
+                         "#a07e56", "#d7bd96", "#eadaba", "#f7ead0", "#f3e7db", "#f6ede4"][::-1]
+fitzpatrick_colors = []
 # Fitzpatrick Skin Type Color Palette (6 squares)
 fitzpatrick_colors = [
-    "#FFE5B4",  # Type I: Very pale, always burns
-    "#F4A460",  # Type II: Fair, burns easily
-    "#D2691E",  # Type III: Medium, sometimes tans
-    "#8B4513",  # Type IV: Olive, rarely burns
-    "#5D4037",  # Type V: Dark brown, never burns
-    "#3E2723"  # Type VI: Very dark brown/black, never burns
+    "#ebd3b1",  # Type I: Very pale, always burns
+    "#d9b591",  # Type II: Fair, burns easily
+    "#c59c7e",  # Type III: Medium, sometimes tans
+    "#a97754",  # Type IV: Olive, rarely burns
+    "#955c2f",  # Type V: Dark brown, never burns
+    "#341f1a"  # Type VI: Very dark brown/black, never burns
 ]
+
 
 class ColorWidget(QWidget):
     def __init__(self, color_hex, onColorClick: Callable[["ColorWidget"], None], *args, **kwargs):
@@ -133,6 +125,7 @@ class ColorSamplesLayout(QHBoxLayout):
         for w in self.color_widgets:
             w.deselect()
 
+
 class Annotator(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -198,7 +191,6 @@ class Annotator(QMainWindow):
 
         self.annotations_file_path = None
         self.annotations_df = None
-
 
     def select_image_folder(self):
         """Open folder picker and validate image files"""
@@ -397,13 +389,13 @@ class Annotator(QMainWindow):
         # Check if image already annotated and update or append
         existing_annotation = self.annotations_df[
             self.annotations_df['image_name'] == current_image_name
-            ]
+        ]
 
         if not existing_annotation.empty:
             # Replace existing annotation
             self.annotations_df = self.annotations_df[
                 self.annotations_df['image_name'] != current_image_name
-                ]
+            ]
 
         # Append new annotation
         self.annotations_df = pd.concat([
@@ -420,7 +412,8 @@ class Annotator(QMainWindow):
         self.fitzpatrick_skin_tone_picker.reset()
 
         if self.annotations_df is not None and not self.annotations_df.empty:
-            annotation_row = self.annotations_df[self.annotations_df["image_name"] == self.image_names[self.current_image_index]]
+            annotation_row = self.annotations_df[self.annotations_df["image_name"]
+                                                 == self.image_names[self.current_image_index]]
 
             print(annotation_row)
             if not annotation_row.empty:
@@ -451,7 +444,6 @@ class Annotator(QMainWindow):
         self.image_count_label.setText(image_count_text)
 
         self.update_current_image_annotations()
-
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle left and right arrow key navigation"""
@@ -489,6 +481,7 @@ class Annotator(QMainWindow):
     def reset_both_color_pickers(self):
         self.monk_skin_tone_picker.reset()
         self.fitzpatrick_skin_tone_picker.reset()
+
 
 def main():
     app = QApplication(sys.argv)
